@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "MiniChat - mesagerie locala cu istoric (Flask + Socket.IO + SQLite)"
 readme = "README.md"
 authors = [
-    { name = "Popa Ghita Didita Nicola Andra", email = "nicola_andra.popa@stud.etti.upb.ro" }
-    {name="Duna Bianca", email="bianca.duna@stud.etti.upb.ro"}
+    { name = "Popa Ghita Didita Nicola Andra", email = "nicola_andra.popa@stud.etti.upb.ro" },
+    { name = "Duna Bianca", email="bianca.duna@stud.etti.upb.ro"}
 ]
 requires-python = ">=3.14"
 dependencies = [
