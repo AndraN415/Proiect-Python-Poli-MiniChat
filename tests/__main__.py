@@ -6,6 +6,8 @@ import time
 import unittest
 from collections import Counter
 from pathlib import Path
+from types import TracebackType
+from typing import TextIO
 
 TESTS_DIR = Path(__file__).resolve().parent
 
@@ -13,33 +15,36 @@ TESTS_DIR = Path(__file__).resolve().parent
 SEVERITY = ["pass", "skip", "fail", "error"]
 ICONS = {"pass": ("✓", "32"), "skip": ("-", "33"), "fail": ("✗", "31"), "error": ("!", "31")}
 
+type ExcInfo = tuple[type[BaseException], BaseException, TracebackType]
 
-def use_color(stream):
+
+def use_color(stream: TextIO) -> bool:
     if os.environ.get("NO_COLOR"):
         return False
     return bool(os.environ.get("FORCE_COLOR")) or stream.isatty()
 
 
 class PrettyResult(unittest.TestResult):
-    def __init__(self, stream):
+    def __init__(self, stream: TextIO) -> None:
         super().__init__()
         self.stream = stream  # unittest also uses this to decide whether to colour tracebacks
         self.color = use_color(stream)
-        self.group = None
+        self.group: str | None = None
         self.status = "pass"
-        self.counts = Counter()
+        self.counts: Counter[str] = Counter()
+        self.started = 0.0
 
-    def paint(self, text, code):
+    def paint(self, text: str, code: str) -> str:
         return f"\033[{code}m{text}\033[0m" if self.color else text
 
-    def write(self, text=""):
+    def write(self, text: str = "") -> None:
         self.stream.write(text + "\n")
         self.stream.flush()
 
-    def mark(self, status):
+    def mark(self, status: str) -> None:
         self.status = max(self.status, status, key=SEVERITY.index)
 
-    def startTest(self, test):
+    def startTest(self, test: unittest.TestCase) -> None:
         super().startTest(test)
         group = f"{type(test).__module__.removeprefix('tests.test_')} › {type(test).__name__}"
         if group != self.group:
@@ -48,7 +53,7 @@ class PrettyResult(unittest.TestResult):
         self.status = "pass"
         self.started = time.perf_counter()
 
-    def stopTest(self, test):
+    def stopTest(self, test: unittest.TestCase) -> None:
         super().stopTest(test)
         icon, color = ICONS[self.status]
         name = getattr(test, "_testMethodName", str(test)).removeprefix("test_").replace("_", " ")
@@ -56,24 +61,24 @@ class PrettyResult(unittest.TestResult):
         self.write(f"    {self.paint(icon, color)} {name} {self.paint(f'{ms:.0f}ms', '2')}")
         self.counts[self.status] += 1
 
-    def addFailure(self, test, err):
+    def addFailure(self, test: unittest.TestCase, err: ExcInfo) -> None:
         super().addFailure(test, err)
         self.mark("fail")
 
-    def addError(self, test, err):
+    def addError(self, test: unittest.TestCase, err: ExcInfo) -> None:
         super().addError(test, err)
         self.mark("error")
 
-    def addSubTest(self, test, subtest, err):
+    def addSubTest(self, test: unittest.TestCase, subtest: unittest.TestCase, err: ExcInfo | None) -> None:
         super().addSubTest(test, subtest, err)
         if err is not None:
             self.mark("fail" if issubclass(err[0], test.failureException) else "error")
 
-    def addSkip(self, test, reason):
+    def addSkip(self, test: unittest.TestCase, reason: str) -> None:
         super().addSkip(test, reason)
         self.mark("skip")
 
-    def summary(self, seconds):
+    def summary(self, seconds: float) -> None:
         for label, entries in (("FAIL", self.failures), ("ERROR", self.errors)):
             for test, trace in entries:
                 self.write(f"\n{self.paint(f' {label} ', '1;41')} {self.paint(str(test), '1')}")
@@ -92,7 +97,7 @@ class PrettyResult(unittest.TestResult):
         self.write(f"  {verdict}   {', '.join(parts)} {self.paint(f'in {seconds:.2f}s', '2')}\n")
 
 
-def main():
+def main() -> int:
     # failure messages can contain lone surrogates (see the sanitising tests); print them escaped
     sys.stdout.reconfigure(errors="backslashreplace")
     suite = unittest.defaultTestLoader.discover(str(TESTS_DIR), top_level_dir=str(TESTS_DIR.parent))

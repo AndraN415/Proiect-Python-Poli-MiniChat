@@ -4,6 +4,7 @@
 <div class="app">
   <header class="topbar">
     <strong>minichat</strong>
+    <span id="connection" class="connection" data-state="connecting" role="status">Connecting…</span>
     <span class="who">{{ user.display_name }} · login id <code>{{ user.id }}</code></span>
     <button id="logout">Log out</button>
   </header>
@@ -21,7 +22,10 @@
     </aside>
 
     <main class="chat">
-      <h2 id="room-title">Pick a room</h2>
+      <div class="chat-head">
+        <h2 id="room-title">Pick a room</h2>
+        <ul id="members" class="members" aria-label="Members" hidden></ul>
+      </div>
       <ul id="messages"></ul>
       <form id="message-form" class="inline" hidden>
         <input name="content" placeholder="Message" maxlength="1000" required autocomplete="off">

@@ -89,6 +89,42 @@ h2 {
   margin-left: auto;
 }
 
+/* status dots: the connection in the top bar, each member next to the room title */
+
+.connection::before,
+.members li::before {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  margin-right: 0.35em;
+  border-radius: 50%;
+  background: var(--dot, GrayText);
+}
+
+.connection {
+  font-size: 0.85em;
+}
+
+.connection[data-state="online"],
+.members .online {
+  --dot: #2a9d4b;
+}
+
+.connection[data-state="connecting"] {
+  --dot: #d9a400;
+}
+
+.connection[data-state="offline"] {
+  --dot: #d33;
+  color: #d33;
+}
+
+.members .offline,
+.members.stale {
+  opacity: 0.6;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 240px 1fr;
@@ -143,6 +179,23 @@ button.room-name {
 
 .rooms li.active .room-name {
   font-weight: bold;
+}
+
+.chat-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+}
+
+.members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85em;
 }
 
 .chat {

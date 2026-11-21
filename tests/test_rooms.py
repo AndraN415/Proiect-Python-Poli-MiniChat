@@ -1,3 +1,7 @@
+from typing import Any
+
+from flask.testing import FlaskClient
+
 from app.routes.api import HISTORY_LIMIT
 from tests import AppTestCase, app, socket
 
@@ -5,7 +9,7 @@ from tests import AppTestCase, app, socket
 class RoomTestCase(AppTestCase):
     """An "owner" user with a "general" room, and self.client logged in as alice (not a member)."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.owner_client = self.new_client()
         self.owner = self.register("owner", client=self.owner_client)
@@ -13,21 +17,21 @@ class RoomTestCase(AppTestCase):
         self.url = f"/api/rooms/{self.room['id']}"
         self.alice = self.register("alice")
 
-    def permission(self):
+    def permission(self) -> str:
         return self.client.get(f"{self.url}/permission").get_json()["permission"]
 
 
 class ListRoomsTests(AppTestCase):
-    def test_requires_login(self):
+    def test_requires_login(self) -> None:
         self.assertError(self.client.get("/api/rooms"), 401)
 
-    def test_empty(self):
+    def test_empty(self) -> None:
         self.register()
         response = self.client.get("/api/rooms")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), [])
 
-    def test_sorted_by_name_with_permission_for_current_user(self):
+    def test_sorted_by_name_with_permission_for_current_user(self) -> None:
         self.register("alice")
         self.create_room("zeta")
         self.create_room("alpha")
@@ -44,10 +48,10 @@ class ListRoomsTests(AppTestCase):
 
 
 class CreateRoomTests(AppTestCase):
-    def test_requires_login(self):
+    def test_requires_login(self) -> None:
         self.assertError(self.client.post("/api/rooms", json={"display_name": "general"}), 401)
 
-    def test_creates_room_and_joins_creator(self):
+    def test_creates_room_and_joins_creator(self) -> None:
         self.register()
         response = self.client.post("/api/rooms", json={"display_name": "  general  "})
         self.assertEqual(response.status_code, 201)
@@ -57,13 +61,13 @@ class CreateRoomTests(AppTestCase):
         self.assertEqual(self.room_member_count(room["id"]), 1)
         self.assertEqual(self.client.get("/api/rooms").get_json(), [room])
 
-    def test_rejects_duplicate_name(self):
+    def test_rejects_duplicate_name(self) -> None:
         self.register()
         self.create_room("general")
         self.assertError(self.client.post("/api/rooms", json={"display_name": "general"}), 409)
         self.assertEqual(len(self.client.get("/api/rooms").get_json()), 1)
 
-    def test_duplicate_check_ignores_case_and_invisible_characters(self):
+    def test_duplicate_check_ignores_case_and_invisible_characters(self) -> None:
         self.register()
         self.create_room("general")
         for name in ["General", "GENERAL", "gen​eral", " general\t"]:
@@ -71,11 +75,11 @@ class CreateRoomTests(AppTestCase):
                 self.assertError(self.client.post("/api/rooms", json={"display_name": name}), 409)
         self.assertEqual(len(self.client.get("/api/rooms").get_json()), 1)
 
-    def test_room_name_is_sanitised(self):
+    def test_room_name_is_sanitised(self) -> None:
         self.register()
         self.assertEqual(self.create_room("  proiect\x00 ‮ python ")["display_name"], "proiect python")
 
-    def test_rejects_invalid_names(self):
+    def test_rejects_invalid_names(self) -> None:
         self.register()
         bodies = [None, {}, ["general"], {"display_name": ""}, {"display_name": "   "},
                   {"display_name": "​"}, {"display_name": 7}, {"display_name": "x" * 33}]
@@ -84,7 +88,7 @@ class CreateRoomTests(AppTestCase):
                 self.assertError(self.client.post("/api/rooms", json=body), 400)
         self.assertEqual(self.client.get("/api/rooms").get_json(), [])
 
-    def test_notifies_connected_clients(self):
+    def test_notifies_connected_clients(self) -> None:
         bob = self.new_client()
         self.register("bob", client=bob)
         bob_socket = socket.test_client(app, flask_test_client=bob)
@@ -97,39 +101,39 @@ class CreateRoomTests(AppTestCase):
 
 
 class JoinRoomTests(RoomTestCase):
-    def test_requires_login(self):
+    def test_requires_login(self) -> None:
         self.assertError(self.new_client().post(f"{self.url}/join"), 401)
 
-    def test_unknown_room(self):
+    def test_unknown_room(self) -> None:
         self.assertError(self.client.post("/api/rooms/999/join"), 404)
         self.assertEqual(self.client.post("/api/rooms/abc/join").status_code, 404)
 
-    def test_joins_room(self):
+    def test_joins_room(self) -> None:
         response = self.client.post(f"{self.url}/join")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {**self.room, "permission": "member"})
         self.assertEqual(self.permission(), "member")
         self.assertEqual(self.room_member_count(self.room["id"]), 2)
 
-    def test_joining_twice_is_a_no_op(self):
+    def test_joining_twice_is_a_no_op(self) -> None:
         self.client.post(f"{self.url}/join")
         response = self.client.post(f"{self.url}/join")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["permission"], "member")
         self.assertEqual(self.room_member_count(self.room["id"]), 2)
 
-    def test_only_post_is_allowed(self):
+    def test_only_post_is_allowed(self) -> None:
         self.assertEqual(self.client.get(f"{self.url}/join").status_code, 405)
 
 
 class LeaveRoomTests(RoomTestCase):
-    def test_requires_login(self):
+    def test_requires_login(self) -> None:
         self.assertError(self.new_client().post(f"{self.url}/leave"), 401)
 
-    def test_unknown_room(self):
+    def test_unknown_room(self) -> None:
         self.assertError(self.client.post("/api/rooms/999/leave"), 404)
 
-    def test_leaves_room(self):
+    def test_leaves_room(self) -> None:
         self.client.post(f"{self.url}/join")
         response = self.client.post(f"{self.url}/leave")
         self.assertEqual(response.status_code, 200)
@@ -137,18 +141,18 @@ class LeaveRoomTests(RoomTestCase):
         self.assertEqual(self.permission(), "none")
         self.assertEqual(self.room_member_count(self.room["id"]), 1)
 
-    def test_leaving_when_not_a_member_is_a_no_op(self):
+    def test_leaving_when_not_a_member_is_a_no_op(self) -> None:
         response = self.client.post(f"{self.url}/leave")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["permission"], "none")
         self.assertEqual(self.room_member_count(self.room["id"]), 1)
 
-    def test_room_survives_when_last_member_leaves(self):
+    def test_room_survives_when_last_member_leaves(self) -> None:
         self.owner_client.post(f"{self.url}/leave")
         self.assertEqual(self.room_member_count(self.room["id"]), 0)
         self.assertEqual(self.client.get("/api/rooms").get_json(), [{**self.room, "permission": "none"}])
 
-    def test_can_rejoin(self):
+    def test_can_rejoin(self) -> None:
         self.client.post(f"{self.url}/join")
         self.client.post(f"{self.url}/leave")
         self.client.post(f"{self.url}/join")
@@ -156,22 +160,22 @@ class LeaveRoomTests(RoomTestCase):
 
 
 class RoomPermissionTests(RoomTestCase):
-    def test_requires_login(self):
+    def test_requires_login(self) -> None:
         self.assertError(self.new_client().get(f"{self.url}/permission"), 401)
 
-    def test_unknown_room(self):
+    def test_unknown_room(self) -> None:
         self.assertError(self.client.get("/api/rooms/999/permission"), 404)
 
-    def test_none_for_non_member(self):
+    def test_none_for_non_member(self) -> None:
         response = self.client.get(f"{self.url}/permission")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"room_id": self.room["id"], "permission": "none"})
 
-    def test_member_for_creator(self):
+    def test_member_for_creator(self) -> None:
         response = self.owner_client.get(f"{self.url}/permission")
         self.assertEqual(response.get_json(), {"room_id": self.room["id"], "permission": "member"})
 
-    def test_follows_join_and_leave(self):
+    def test_follows_join_and_leave(self) -> None:
         self.client.post(f"{self.url}/join")
         self.assertEqual(self.permission(), "member")
         self.client.post(f"{self.url}/leave")
@@ -179,25 +183,26 @@ class RoomPermissionTests(RoomTestCase):
 
 
 class RoomMessagesTests(RoomTestCase):
-    def messages(self, client=None):
-        response = (client or self.owner_client).get(f"{self.url}/messages")
+    def messages(self, client: FlaskClient | None = None, after: int | None = None) -> list[Any]:
+        query = "" if after is None else f"?after={after}"
+        response = (client or self.owner_client).get(f"{self.url}/messages{query}")
         self.assertEqual(response.status_code, 200)
         return response.get_json()
 
-    def test_requires_login(self):
+    def test_requires_login(self) -> None:
         self.assertError(self.new_client().get(f"{self.url}/messages"), 401)
 
-    def test_unknown_room(self):
+    def test_unknown_room(self) -> None:
         self.assertError(self.client.get("/api/rooms/999/messages"), 404)
 
-    def test_forbidden_for_non_member(self):
+    def test_forbidden_for_non_member(self) -> None:
         self.add_messages(self.room["id"], self.owner["id"], "secret")
         self.assertError(self.client.get(f"{self.url}/messages"), 403)
 
-    def test_empty_room(self):
+    def test_empty_room(self) -> None:
         self.assertEqual(self.messages(), [])
 
-    def test_oldest_first_with_author_name(self):
+    def test_oldest_first_with_author_name(self) -> None:
         self.client.post(f"{self.url}/join")
         self.add_messages(self.room["id"], self.owner["id"], "first")
         self.add_messages(self.room["id"], self.alice["id"], "second")
@@ -207,33 +212,106 @@ class RoomMessagesTests(RoomTestCase):
         self.assertEqual(set(messages[0]), {"id", "room_id", "display_name", "content", "sent_at"})
         self.assertEqual(messages[0]["room_id"], self.room["id"])
 
-    def test_never_exposes_login_ids(self):
+    def test_never_exposes_login_ids(self) -> None:
         self.add_messages(self.room["id"], self.owner["id"], "hello")
         response = self.owner_client.get(f"{self.url}/messages")
         self.assertNotIn(self.owner["id"], response.get_data(as_text=True))
 
-    def test_only_messages_of_that_room(self):
+    def test_only_messages_of_that_room(self) -> None:
         other = self.create_room("other", client=self.owner_client)
         self.add_messages(self.room["id"], self.owner["id"], "here")
         self.add_messages(other["id"], self.owner["id"], "elsewhere")
         self.assertEqual([m["content"] for m in self.messages()], ["here"])
 
-    def test_limited_to_latest_messages(self):
+    def test_limited_to_latest_messages(self) -> None:
         total = HISTORY_LIMIT + 5
         self.add_messages(self.room["id"], self.owner["id"], *(f"m{i}" for i in range(total)))
         contents = [m["content"] for m in self.messages()]
         self.assertEqual(contents, [f"m{i}" for i in range(5, total)])
 
+    def test_after_returns_only_newer_messages_oldest_first(self) -> None:
+        self.add_messages(self.room["id"], self.owner["id"], "one", "two", "three", "four")
+        ids = [m["id"] for m in self.messages()]
+        newer = self.messages(after=ids[1])
+        self.assertEqual([m["content"] for m in newer], ["three", "four"])
+        self.assertEqual(newer, self.messages()[2:])
+
+    def test_after_the_last_id_is_empty(self) -> None:
+        self.add_messages(self.room["id"], self.owner["id"], "one", "two")
+        last = self.messages()[-1]["id"]
+        self.assertEqual(self.messages(after=last), [])
+        self.assertEqual(self.messages(after=10**18), [])
+
+    def test_after_zero_starts_from_the_oldest(self) -> None:
+        total = HISTORY_LIMIT + 5
+        self.add_messages(self.room["id"], self.owner["id"], *(f"m{i}" for i in range(total)))
+        self.assertEqual([m["content"] for m in self.messages(after=0)], [f"m{i}" for i in range(HISTORY_LIMIT)])
+
+    def test_after_pages_forward_through_everything_missed(self) -> None:
+        # the reconnect loop of the web client: ask after the last id seen until a page is empty
+        total = 2 * HISTORY_LIMIT + 7
+        self.add_messages(self.room["id"], self.owner["id"], "seen")
+        last = self.messages()[-1]["id"]
+        self.add_messages(self.room["id"], self.owner["id"], *(f"m{i}" for i in range(total)))
+
+        missed, pages = [], 0
+        while page := self.messages(after=last):
+            self.assertLessEqual(len(page), HISTORY_LIMIT)
+            missed += page
+            last = page[-1]["id"]
+            pages += 1
+        self.assertEqual([m["content"] for m in missed], [f"m{i}" for i in range(total)])
+        self.assertEqual(pages, 3)
+
+    def test_after_only_messages_of_that_room(self) -> None:
+        other = self.create_room("other", client=self.owner_client)
+        self.add_messages(other["id"], self.owner["id"], "elsewhere")
+        self.add_messages(self.room["id"], self.owner["id"], "here")
+        self.assertEqual([m["content"] for m in self.messages(after=0)], ["here"])
+
+    def test_rejects_invalid_after(self) -> None:
+        for after in ["", "-1", "abc", "1.5", "1e3", " 1", "0x10", "²", str(2**63), "9" * 25]:
+            with self.subTest(after=after):
+                self.assertError(self.owner_client.get(f"{self.url}/messages", query_string={"after": after}), 400)
+
+    def test_after_requires_membership(self) -> None:
+        self.add_messages(self.room["id"], self.owner["id"], "secret")
+        self.assertError(self.client.get(f"{self.url}/messages?after=0"), 403)
+
+
+class RoomMembersTests(RoomTestCase):
+    """Login, membership and privacy checks; who is online is covered in test_socket."""
+
+    def test_requires_login(self) -> None:
+        self.assertError(self.new_client().get(f"{self.url}/members"), 401)
+
+    def test_unknown_room(self) -> None:
+        self.assertError(self.client.get("/api/rooms/999/members"), 404)
+
+    def test_forbidden_for_non_member(self) -> None:
+        self.assertError(self.client.get(f"{self.url}/members"), 403)
+
+    def test_lists_members_without_login_ids(self) -> None:
+        self.client.post(f"{self.url}/join")
+        response = self.client.get(f"{self.url}/members")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), [
+            {"display_name": "alice", "online": False, "you": True},
+            {"display_name": "owner", "online": False, "you": False},
+        ])
+        for user in (self.owner, self.alice):
+            self.assertNotIn(user["id"], response.get_data(as_text=True))
+
 
 class RoomIdTests(RoomTestCase):
-    ROUTES = [("post", "join"), ("post", "leave"), ("get", "permission"), ("get", "messages")]
+    ROUTES = [("post", "join"), ("post", "leave"), ("get", "permission"), ("get", "members"), ("get", "messages")]
 
-    def test_out_of_range_ids_are_not_found(self):
+    def test_out_of_range_ids_are_not_found(self) -> None:
         for room_id in ["0", "-1", "9223372036854775808", "99999999999999999999", "1.5", "1e3"]:
             for method, route in self.ROUTES:
                 with self.subTest(room_id=room_id, route=route):
                     response = getattr(self.client, method)(f"/api/rooms/{room_id}/{route}")
                     self.assertEqual(response.status_code, 404)
 
-    def test_largest_id_is_a_normal_404(self):
+    def test_largest_id_is_a_normal_404(self) -> None:
         self.assertError(self.client.get("/api/rooms/9223372036854775807/permission"), 404)
