@@ -11,8 +11,13 @@ from typing import Any
 NAME_MAX_LENGTH = 32
 MESSAGE_MAX_LENGTH = 1000
 SQLITE_INTEGER_MAX = 2**63 - 1
+OP_ID_MAX_LENGTH = 64
 
 LOGIN_ID = re.compile(r"[0-9a-f]{12}")
+# picked by the client (the web client uses 32 random hex digits); only the shape is checked here
+OP_ID = re.compile(rf"[0-9A-Za-z_-]{{8,{OP_ID_MAX_LENGTH}}}")
+# [0-9], not \d: \d also matches other scripts' digits, which int() would then have to make sense of
+MESSAGE_ID = re.compile(r"[0-9]{1,19}")
 BLANK_LINES = re.compile(r"\n{3,}")
 # a format character, but it glues emoji sequences together, so it is not invisible noise
 ZERO_WIDTH_JOINER = "‍"
@@ -85,3 +90,20 @@ def room_id(data: Any) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= SQLITE_INTEGER_MAX:
         raise ValidationError("room id must be a positive integer")
     return value
+
+
+def op_id(data: Any) -> str:
+    """The client's id for one send: sending again with the same id must not store the message twice."""
+    value = data.get("op_id") if isinstance(data, dict) else None
+    if not isinstance(value, str) or not OP_ID.fullmatch(value):
+        raise ValidationError(f"operation id must be 8-{OP_ID_MAX_LENGTH} letters, digits, '-' or '_'")
+    return value
+
+
+def after_id(value: str | None) -> int | None:
+    """The `after` query parameter of the message history: the last message id the client already has."""
+    if value is None:
+        return None
+    if not MESSAGE_ID.fullmatch(value) or int(value) > SQLITE_INTEGER_MAX:
+        raise ValidationError("after must be a message id (a non-negative integer)")
+    return int(value)

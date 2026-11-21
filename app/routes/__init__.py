@@ -7,7 +7,7 @@ pages = Blueprint("pages", __name__)
 
 
 @pages.get("/")
-def index():
+def index() -> str:
     user = User.from_session()
     if user is None:
         return render_template("login.html")
